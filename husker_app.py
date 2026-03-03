@@ -1,31 +1,63 @@
 import streamlit as st
-import random
 import requests
-import re
+from bs4 import BeautifulSoup
+import random
 
-# Set page title and Husker Red color theme
-st.set_page_config(page_title="Husker Randomizer", page_icon="🏀")
+# Set up the look of the website
+st.set_page_config(page_title="Husker Hoops Randomizer", page_icon="🌽")
+st.title("🔴 Nebraska Basketball Time Machine")
+st.write("Pick a season, and the app will instantly grab that specific roster from the web!")
 
-def clean_name(name):
-    name = name.lower().replace(" jr.", "jr").replace(" sr.", "sr")
-    parts = name.split()
-    if len(parts) < 2: return re.sub(r'[^a-z0-9]', '', name)
-    first = re.sub(r'[^a-z0-9]', '', parts[0])
-    last = re.sub(r'[^a-z0-9]', '', "".join(parts[1:]))
-    return f"{first}-{last}"
+# 1. Create a dropdown for the years
+# Nebraska basketball goes back a long way, let's do 1950 to the present!
+selected_year = st.selectbox("Choose a Season:", list(range(2025, 1949, -1)))
 
-st.title("🔴 Husker Hoops Randomizer")
-st.write("Find a random Nebraska legend and view their stats!")
-
-# Player list (you can expand this or use your scraper)
-players = ["Tyronn Lue", "Keisei Tominaga", "James Palmer Jr.", "Eric Piatkowski", 
-           "Dave Hoppen", "Shavon Shields", "Brice Williams", "Rienk Mast"]
-
-if st.button('Pick a Random Husker 🏀'):
-    player = random.choice(players)
-    slug = clean_name(player)
-    url = f"https://www.sports-reference.com/cbb/players/{slug}-1.html"
+# 2. The function to scrape ONLY the selected year
+def get_single_roster(year):
+    url = f"https://www.sports-reference.com/cbb/schools/nebraska/men/{year}.html"
     
-    st.divider()
-    st.header(f"You found: {player}")
-    st.link_button("View Stats on Sports Reference", url)
+    # Act like a normal web browser
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    
+    response = requests.get(url, headers=headers)
+    
+    # If the page doesn't exist or blocks us, stop here
+    if response.status_code != 200:
+        return None, url
+        
+    soup = BeautifulSoup(response.text, 'html.parser')
+    players = []
+    
+    # Look directly for the player names on that specific page
+    for player_cell in soup.find_all('td', {'data-stat': 'player'}):
+        a_tag = player_cell.find('a')
+        if a_tag:
+            players.append(a_tag.text.strip())
+            
+    # Remove duplicates (sometimes players are listed twice in different tables)
+    players = list(set(players))
+    return players, url
+
+# 3. The Button that triggers the scrape
+if st.button(f"Get {selected_year} Roster & Pick a Player 🏀"):
+    with st.spinner(f"Traveling to {selected_year} to find the roster..."):
+        roster, url = get_single_roster(selected_year)
+        
+    if roster:
+        st.success(f"Success! Found {len(roster)} players on the {selected_year} team.")
+        
+        # Pick a random player
+        lucky_player = random.choice(roster)
+        
+        st.divider()
+        st.subheader(f"⭐ Your Random Player: **{lucky_player}**")
+        st.link_button(f"View {selected_year} Team Stats on Sports Reference", url)
+        
+        # Optional: Show the whole roster so the user knows it worked
+        with st.expander(f"See everyone on the {selected_year} roster"):
+            for p in sorted(roster):
+                st.write(f"- {p}")
+    else:
+        st.error(f"Could not find a roster for {selected_year}. The data might not exist for that year!")
