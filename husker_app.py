@@ -64,4 +64,8 @@ if st.button(f"Get {selected_year} Roster & Pick a Player 🏀"):
         st.link_button(f"View {selected_year} Team Stats on Sports Reference", url)
         
         # Show the whole roster
-        with st.expander(f"See everyone on
+        with st.expander(f"See everyone on the {selected_year} roster"):
+            for p in sorted(roster):
+                st.write(f"- {p}")
+    else:
+        st.error(f"Could not find a roster for {selected_year}. The proxy might be blocked, or the data doesn't exist!")
